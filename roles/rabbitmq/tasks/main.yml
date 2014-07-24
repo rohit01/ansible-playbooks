@@ -1,0 +1,17 @@
+---
+## rabbitmq Installation
+- name: Add rabbitmq apt repository
+  copy: src=rabbitmq.list dest=/etc/apt/sources.list.d/rabbitmq.list
+  register: rmq_apt_repo
+
+- name: Add apt key for rabbit
+  apt_key: url=http://www.rabbitmq.com/rabbitmq-signing-key-public.asc state=present
+  register: rmq_apt_key
+
+- name: "Update apt cache - apt-get update"
+  apt: update_cache=yes
+  when: rmq_apt_repo.changed or rmq_apt_key.changed
+
+- name: Install rabbitmq
+  apt: update_cache=yes cache_valid_time=86400 name="rabbitmq-server" state="present"
+  notify: restart rabbitmq-server

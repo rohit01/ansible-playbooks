@@ -1,0 +1,31 @@
+---
+## MongoDB installation
+- name: Add mongodb apt key
+  apt_key: keyserver="hkp://keyserver.ubuntu.com:80" id="7F0CEB10" state="present"
+  register: mongodb_apt_key
+
+- name: Add MongoDB apt repository
+  copy: src=mongodb.list dest=/etc/apt/sources.list.d/mongodb.list
+  register: mongodb_apt_repo
+
+- name: "Update apt cache - apt-get update"
+  apt: update_cache=yes
+  when: mongodb_apt_key.changed or mongodb_apt_repo.changed
+
+- name: Install MongoDB
+  apt: update_cache=yes cache_valid_time=86400 name="mongodb-org" state=present
+
+- name: "Setting '/var/log/mongodb' directory permissions"
+  file: dest=/var/log/mongodb owner=mongodb group=mongodb recurse=yes state=directory
+  notify: restart mongodb
+
+- name: "Setting '/var/lib/mongodb' directory permissions"
+  file: dest=/var/lib/mongodb owner=mongodb group=mongodb recurse=yes state=directory
+  notify: restart mongodb
+
+- name: Copy MongoDB config file
+  copy: src=mongod.conf dest=/etc/mongod.conf
+  notify: restart mongod
+
+- name: Enable MongoDB to start on boot
+  service: name=mongod runlevel="2345" enabled="yes" state="started"

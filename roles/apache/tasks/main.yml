@@ -1,0 +1,37 @@
+---
+# Apache installation
+- name: install apache
+  yum: pkg={{ item }} state=present
+  with_items:
+   - php
+   - httpd
+   - libsemanage-python
+   - libselinux-python
+  when: is_centos
+
+- name: install apache
+  apt: update_cache=yes cache_valid_time=86400 name={{ item }} state="present"
+  with_items:
+   - apache2
+   - php5-gd
+   - libgd2-xpm
+   - libgd2-xpm-dev
+   - libapache2-mod-php5
+  when: is_debian
+
+- name: install apache
+  apt: update_cache=yes cache_valid_time=86400 name={{ item }} state="present"
+  with_items:
+   - apache2
+   - php5-gd
+   - libgd2-xpm-dev
+   - libapache2-mod-php5
+  when: is_ubuntu
+
+- name: Activate Apache cgi  on Ubuntu 14.04
+  file: src=/etc/apache2/mods-available/cgi.load dest=/etc/apache2/mods-enabled/cgi.load state=link owner=root group=root
+  notify: restart apache
+  when: is_ubuntu
+
+- name: http service state
+  service: name={{ apache }} state=started enabled=yes

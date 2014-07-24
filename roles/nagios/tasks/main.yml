@@ -1,0 +1,191 @@
+---
+# Nagios installation
+- name: Ensure download directory is present
+  file: path={{ ansible_env.HOME }}/nagios state="directory"
+
+- name: Downloading the EPEL repository definitions.
+  get_url: url=http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm dest={{ ansible_env.HOME }}/nagios/epel-release-6-8.noarch.rpm
+  when: is_centos
+
+- name: Downloading and enable the EPEL repository definitions.
+  yum: name={{ ansible_env.HOME }}/nagios//epel-release-6-8.noarch.rpm state=present
+  when: is_centos
+
+- name: Install Nagios prerequisites for CentOS
+  yum: pkg={{ item }} state=present
+  with_items:
+   - gcc
+   - glibc
+   - glibc-common
+   - gd
+   - gd-devel
+   - make
+   - perl
+   - perl-devel
+   - wget
+   - python-passlib
+  when: is_centos
+
+- name: Install Nagios prerequisites for Debian
+  apt: update_cache=yes cache_valid_time=86400 name={{ item }} state="present"
+  with_items:
+   - linux-headers-{{ ansible_kernel }}
+   - build-essential
+   - python-passlib
+  when: is_debian
+
+- name: Install Nagios prerequisites for Ubuntu
+  apt: update_cache=yes cache_valid_time=86400 name={{ item }} state="present"
+  with_items:
+   - linux-headers-{{ ansible_kernel }}
+   - build-essential
+   - python-passlib
+  when: is_ubuntu
+
+- name: Install plugin prerequisites for CentOS
+  yum: pkg={{ item }} state=present
+  with_items:
+   - openssl-devel
+   - fping
+   - openldap-devel
+   - postgresql-devel
+   - radiusclient-ng-devel
+   - samba-client
+   - libsmbclient
+  when: is_centos
+
+- name: Install Plugin prerequisites for Debian
+  apt: update_cache=yes cache_valid_time=86400 name={{ item }} state="present"
+  with_items:
+   - libssl-dev
+   - dnsutils
+   - fping
+   - libldap2-dev
+   - libpq-dev
+   - libradiusclient-ng-dev
+   - smbclient
+   - gawk
+  when: is_debian
+
+- name: Install Plugin prerequisites for Ubuntu
+  apt: update_cache=yes cache_valid_time=86400 name={{ item }} state="present"
+  with_items:
+   - libssl-dev
+   - dnsutils
+   - fping
+   - libldap2-dev
+   - libpq-dev
+   - libradiusclient-ng-dev
+   - smbclient
+   - gawk
+  when: is_ubuntu
+
+- name: Create nagcmd group
+  group: name=nagcmd state=present
+
+- name: Create nagios user
+  user: name=nagios state=present groups=nagcmd
+
+- name: Add apache user to nagcmd group
+  user: name={{ apacheuser }} state=present groups=nagcmd
+
+- name: GET Nagios
+  get_url: url={{ nagiosurl }} dest={{ ansible_env.HOME }}/nagios/{{ nagiossrc }}.tar.gz
+
+- name: Get Plugins
+  get_url: url={{ pluginsurl }} dest={{ ansible_env.HOME }}/nagios/{{ pluginssrc }}.tar.gz
+
+- name: Get NRPE
+  get_url: url={{ nrpeurl }} dest={{ ansible_env.HOME }}/nagios/{{ nrpesrc }}.tar.gz
+
+- name: Unpack Nagios source files
+  shell: cd {{ ansible_env.HOME }}/nagios && tar -xzvf {{ nagiossrc }}.tar.gz creates={{ ansible_env['HOME'] }}/nagios/{{ nagiossrc }}
+
+- name: Configure
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && ./configure --with-command-group=nagcmd creates={{ ansible_env['HOME'] }}/nagios/{{ nagiossrc }}/Makefile
+  when: is_centos
+
+- name: Configure
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && ./configure --with-command-group=nagcmd creates={{ ansible_env['HOME'] }}/nagios/{{ nagiossrc }}/Makefile
+  when: is_debian
+
+- name: Configure
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && ./configure --with-command-group=nagcmd -with-httpd_conf=/etc/apache2/conf-available creates={{ ansible_env['HOME'] }}/nagios/{{ nagiossrc }}/Makefile
+  when: is_ubuntu
+
+- name: Make all
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make all creates={{ ansible_env['HOME'] }}/nagios/{{ nagiossrc }}/base/nagios
+
+- name: Make install
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install creates=/usr/local/nagios/bin/nagios
+
+- name: Make install-config
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install-config creates=/usr/local/nagios/etc/nagios.cfg
+
+- name: Make install-commandmode
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install-commandmode creates=/usr/local/nagios/var/rw
+
+- name: Make install-devel
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install-devel creates=/usr/local/nagios/include/nagios/nagios.h
+
+- name: Make install-webconf
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install-webconf creates=/etc/httpd/conf.d/nagios.conf
+  notify: restart apache
+  when: is_centos
+
+- name: Make install-webconf
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install-webconf creates=/etc/apache2/conf.d/nagios.conf
+  notify: restart apache
+  when: is_debian
+
+- name: Make install-webconf
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install-webconf creates=/etc/apache2/conf-available/nagios.conf
+  when: is_ubuntu
+
+- name: Activate Nagios site on Ubuntu 14.04
+  file: src=/etc/apache2/conf-available/nagios.conf dest=/etc/apache2/conf-enabled/nagios.conf state=link owner=root group=root
+  notify: restart apache
+  when: is_ubuntu
+
+- name: Make install-init
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nagiossrc }} && make install-init creates=/etc/init.d/nagios
+
+- name: Set htpasswd for nagiosadmin
+  htpasswd: path=/usr/local/nagios/etc/htpasswd.users name=nagiosadmin password={{ nagiosadminpass }} state=present
+
+- name: Unpack Plugin source files
+  shell: cd {{ ansible_env.HOME }}/nagios && tar -xzvf {{ pluginssrc }}.tar.gz creates={{ ansible_env['HOME'] }}/nagios/{{ pluginssrc }}
+
+- name: Configure Plugins
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ pluginssrc }} && ./configure --with-nagios-user=nagios --with-nagios-group=nagios --with-openssl=/usr/bin/openssl creates={{ ansible_env['HOME'] }}/nagios/{{ pluginssrc }}/Makefile
+
+- name: Make Plugins
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ pluginssrc }} && make creates={{ ansible_env['HOME'] }}/nagios/{{ pluginssrc }}/plugins/check_ping
+
+- name: Make Install Plugins
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ pluginssrc }} && make install creates=/usr/local/nagios/libexec/check_ping
+
+- name: Unpack NRPE source files
+  shell: cd {{ ansible_env.HOME }}/nagios && tar -xzvf {{ nrpesrc }}.tar.gz creates={{ ansible_env['HOME'] }}/nagios/{{ nrpesrc }}
+
+- name: Configure NRPE
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nrpesrc }} && ./configure --with-ssl=/usr/bin/openssl --with-ssl-lib=/usr/lib/x86_64-linux-gnu creates={{ ansible_env['HOME'] }}/nagios/{{ nrpesrc }}/Makefile
+
+- name: Make NRPE
+  shell: cd {{ ansible_env.HOME }}/nagios/{{ nrpesrc }} && make all creates={{ ansible_env['HOME'] }}/nagios/{{ nrpesrc }}/src/check_nrpe
+
+- name: Copy check_nrpe
+  shell: cp {{ ansible_env['HOME'] }}/nagios/{{ nrpesrc }}/src/check_nrpe /usr/local/nagios/libexec/check_nrpe creates=/usr/local/nagios/libexec/check_nrpe
+
+- name: Ensure Nagios is started
+  service: name=nagios state=started enabled=yes
+
+- name: Fix Nagios startup on Debian
+  shell: cd /etc/rc2.d && ln -s ../init.d/nagios S18nagios creates=/etc/rc2.d/S18nagios
+  #file: src=/etc/init.d/nagios dest=/etc/rc2.d/S99nagios state=link owner=root group=root
+  when: is_debian
+
+- name: Check if SELinux is running in enforcing mode and change access
+  file: path=/usr/local/nagios setype=httpd_sys_content_t state=directory recurse=yes
+  when: ansible_selinux != False and ansible_selinux.mode == "enforcing"
+

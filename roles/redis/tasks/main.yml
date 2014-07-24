@@ -1,0 +1,27 @@
+---
+# Redis installation
+- name: Install dependencies for redis (via apt)
+  apt: update_cache=yes cache_valid_time=86400 name="redis-server"
+
+- name: Copy configuration file - redis.conf
+  copy: src=redis.conf dest=/etc/redis/redis.conf
+  notify: restart redis-server
+
+- name: Copy init file - redis-server
+  copy: src=redis-server dest=/etc/init.d/redis-server
+  notify: restart redis-server
+
+- name: Setting file permissions for init file - redis-server
+  file: path=/etc/init.d/redis-server owner=root group=root mode=0755 state=file
+  notify: restart redis-server
+
+- name: mkdir -p /var/lib/redis
+  file: path=/var/lib/redis owner=redis group=redis state=directory
+  notify: restart redis-server
+
+- name: mkdir -p /var/log/redis
+  file: path=/var/log/redis owner=redis group=redis state=directory
+  notify: restart redis-server
+
+- name: Enable redis to start on boot
+  service: name=redis-server runlevel="2345" enabled="yes" state="started"

@@ -1,0 +1,16 @@
+---
+- hosts: all
+  gather_facts: yes
+  user: rohit
+  sudo: yes
+  vars:
+    is_centos: "'{{ ansible_distribution|lower }}' == 'centos'"
+    is_debian: "'{{ ansible_distribution|lower }}' == 'debian'"
+    is_ubuntu: "'{{ ansible_distribution|lower }}' == 'ubuntu'"
+  vars_files:
+    - "vars/{{ ansible_distribution|lower }}.yml"
+
+  roles:
+    # Configured for nagios installation
+    - { role: apache }
+    - { role: nagios }

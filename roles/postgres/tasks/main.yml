@@ -1,0 +1,9 @@
+---
+# Postgres installation
+- name: Installing PostgreSQL
+  apt: update_cache=yes cache_valid_time=86400 name={{ item }} state="present"
+  with_items:
+      - postgresql-client
+      - postgresql
+      - postgresql-contrib
+  notify: restart postgres

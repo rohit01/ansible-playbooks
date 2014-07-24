@@ -1,0 +1,5 @@
+---
+# Nginx installation
+- name: Install Nginx
+  apt: update_cache=yes cache_valid_time=86400 name="nginx-full" state=present
+  notify: restart nginx
